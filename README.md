@@ -1,90 +1,92 @@
-# GenKey – React Native + Cloudflare Workers
+# GenKey
 
-**Passwordless multi-factor + Classic 2FA with continuous risk monitoring.**
+**Strong, phishing-resistant authentication for any website or app.**
 
-Zero / very low cost stack:
-- **Backend**: Cloudflare Workers + D1 (SQLite)
-- **App**: React Native (Expo)
+GenKey replaces weak password + SMS/code login with:
+
+- **Passwordless** (Face ID / fingerprint only) — already multi-factor
+- **Classic 2FA** (password + passkey)
+- **Continuous risk monitoring** after login
+- **Automatic step-up** when risk is high
+
+## What the user experiences
+
+1. Clicks “Sign in with GenKey”
+2. Unlocks with Face ID / fingerprint
+3. They’re in
+4. GenKey keeps watching in the background
+
+Phishing sites cannot steal the passkey.
 
 ## Project Structure
 
 ```
 GenKey-RN/
-├── backend/          # Cloudflare Worker
-│   ├── src/index.js
-│   ├── schema.sql
-│   ├── wrangler.toml
-│   └── package.json
-└── app/              # Expo React Native app
-    ├── App.js
-    └── package.json
+├── backend/          # Cloudflare Workers + D1 backend
+├── sdk/              # JavaScript SDK for websites
+├── web-demo/         # Live demo page
+├── app/              # React Native (Expo) starter
+├── INTEGRATION.md    # How websites/apps integrate GenKey
+└── README.md
 ```
 
-## 1. Deploy the Backend (Cloudflare)
+## Quick Start
+
+### 1. Deploy Backend (Cloudflare)
 
 ```bash
 cd backend
 npm install
 npx wrangler login
 npx wrangler d1 create genkey-db
-```
-
-Copy the `database_id` that is printed and paste it into `wrangler.toml`.
-
-Then run the migration:
-
-```bash
+# Put the database_id into wrangler.toml
 npx wrangler d1 execute genkey-db --file=./schema.sql
-```
-
-Deploy:
-
-```bash
 npx wrangler deploy
 ```
 
-After deploy you will get a URL like:
-`https://genkey.<your-subdomain>.workers.dev`
+You will receive a URL like `https://genkey.xxxx.workers.dev`.
 
-## 2. Configure the App
+### 2. Test with the Web Demo
 
-Open `app/App.js` and replace:
+1. Open `web-demo/index.html`
+2. Replace `API_BASE` with your Worker URL
+3. Open the page in a browser (must be HTTPS or localhost)
+4. Register → use Face ID / fingerprint → see continuous risk score
+
+### 3. Integrate into your own website
+
+See **[INTEGRATION.md](./INTEGRATION.md)** for the full guide.
+
+Basic usage:
 
 ```js
-const API_BASE = 'https://genkey.YOUR_SUBDOMAIN.workers.dev';
+const genkey = new GenKey('https://your-worker.workers.dev');
+
+// Register
+await genkey.register({ username: 'alice', mode: 'passwordless' });
+
+// Login
+const result = await genkey.login({ username: 'alice' });
 ```
-
-with your real Worker URL.
-
-## 3. Run the App on your phone
-
-```bash
-cd app
-npm install
-npx expo start
-```
-
-Scan the QR code with the **Expo Go** app (iOS/Android).
 
 ## Features
 
-- Passwordless mode (passkey only – multi-factor)
-- Classic 2FA mode (password + passkey)
-- Continuous risk scoring (device, IP, behavior, time)
-- Step-up challenge on high risk
-- Works on iOS and Android
-
-## Notes on Passkeys in React Native
-
-Full native passkey support requires a library such as:
-- `react-native-passkey`
-- or platform modules + Expo config plugins
-
-The current `App.js` contains the complete API flow and UI.  
-The native `Passkey.create()` / `Passkey.get()` calls are marked with TODO so you can plug in the library of your choice.
+| Feature | Status |
+|---------|--------|
+| Passwordless (passkey only) | ✅ |
+| Classic 2FA (password + passkey) | ✅ |
+| Phishing resistance | ✅ |
+| Continuous risk scoring | ✅ |
+| Adaptive step-up | ✅ |
+| JavaScript SDK | ✅ |
+| Cloudflare Workers backend | ✅ |
+| React Native starter | ✅ |
 
 ## Cost
 
-Cloudflare free tier is extremely generous for personal / prototype use.  
-Expo Go is free.  
-Total cost for testing: **$0**.
+- Cloudflare free tier is more than enough for personal and early production use.
+- Total cost to run and test: **$0**.
+
+## Next
+
+When you give me your Cloudflare account details / API tokens, I can help you deploy the backend immediately and finish any remaining polish.
