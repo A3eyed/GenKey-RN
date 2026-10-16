@@ -1,0 +1,13 @@
+name = "genkey"
+main = "src/index.js"
+compatibility_date = "2024-09-23"
+compatibility_flags = ["nodejs_compat"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "genkey-db"
+database_id = "REPLACE_WITH_YOUR_D1_ID"
+
+[vars]
+RP_NAME = "GenKey"
+# RP_ID and ORIGIN will be set after you deploy (use your worker subdomain)
