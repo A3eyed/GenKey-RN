@@ -6,8 +6,7 @@ compatibility_flags = ["nodejs_compat"]
 [[d1_databases]]
 binding = "DB"
 database_name = "genkey-db"
-database_id = "REPLACE_WITH_YOUR_D1_ID"
+database_id = "23707233-8a15-4098-94be-bbb73faac62c"
 
 [vars]
 RP_NAME = "GenKey"
-# RP_ID and ORIGIN will be set after you deploy (use your worker subdomain)
