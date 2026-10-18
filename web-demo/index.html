@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GenKey – Live Demo</title>
+  <style>
+    :root {
+      --bg: #0b0f19; --card: #141b2d; --text: #e8eefc; --muted: #8b9bb8;
+      --primary: #4f8cff; --success: #2ecc71; --danger: #e74c3c; --border: #243049;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: radial-gradient(ellipse at top, #152038, var(--bg));
+      color: var(--text); min-height: 100vh; padding: 24px;
+    }
+    .container { max-width: 440px; margin: 0 auto; }
+    .logo { font-size: 2.4rem; font-weight: 800; text-align: center;
+      background: linear-gradient(135deg, #4f8cff, #a78bfa);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    .tagline { text-align: center; color: var(--muted); margin: 8px 0 28px; font-size: 0.95rem; }
+    .card {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 16px; padding: 24px; margin-bottom: 20px;
+    }
+    label { display: block; font-size: 0.85rem; color: var(--muted); margin-bottom: 6px; }
+    input {
+      width: 100%; padding: 12px 14px; border-radius: 10px;
+      border: 1px solid var(--border); background: #0f1524; color: var(--text);
+      font-size: 1rem; margin-bottom: 14px;
+    }
+    input:focus { outline: none; border-color: var(--primary); }
+    .modes { display: flex; gap: 10px; margin-bottom: 18px; }
+    .mode {
+      flex: 1; padding: 10px; text-align: center; border-radius: 10px;
+      border: 1px solid var(--border); background: #0f1524; cursor: pointer; font-size: 0.9rem;
+    }
+    .mode.active { border-color: var(--primary); background: #1a2744; }
+    button {
+      width: 100%; padding: 14px; border: none; border-radius: 10px;
+      font-size: 1rem; font-weight: 600; cursor: pointer; margin-bottom: 10px;
+    }
+    .primary { background: var(--primary); color: white; }
+    .secondary { background: #243049; color: var(--text); }
+    .status { text-align: center; margin-top: 12px; font-size: 0.9rem; color: var(--muted); min-height: 1.3em; }
+    .status.error { color: var(--danger); }
+    .status.success { color: var(--success); }
+    .hidden { display: none; }
+    .risk-score { font-size: 3rem; font-weight: 800; text-align: center; margin: 10px 0; }
+    .low { color: var(--success); } .medium { color: #f39c12; } .high { color: var(--danger); }
+    .reasons { font-size: 0.85rem; color: var(--muted); text-align: center; margin-bottom: 16px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="logo">GenKey</div>
+    <p class="tagline">Passwordless + Classic 2FA · Continuous Protection</p>
+
+    <div class="card" id="auth-card">
+      <label>Username</label>
+      <input id="username" placeholder="alice" autocomplete="username" />
+
+      <label>Password <span style="opacity:0.6">(only for Classic 2FA)</span></label>
+      <input id="password" type="password" placeholder="Optional" />
+
+      <div class="modes">
+        <div class="mode active" data-mode="passwordless">Passwordless</div>
+        <div class="mode" data-mode="classic">Classic 2FA</div>
+      </div>
+
+      <button class="primary" id="btn-register">Register</button>
+      <button class="secondary" id="btn-login">Sign In</button>
+      <p class="status" id="status"></p>
+    </div>
+
+    <div class="card hidden" id="dashboard">
+      <h2 style="text-align:center;margin-bottom:4px">Welcome, <span id="display-name"></span></h2>
+      <p style="text-align:center;color:var(--muted);margin-bottom:20px" id="mode-label"></p>
+
+      <div style="text-align:center">
+        <div style="color:var(--muted);font-size:0.9rem">Live Risk Score</div>
+        <div class="risk-score low" id="risk-score">0</div>
+        <div id="risk-level" style="font-weight:700;margin-bottom:8px">LOW</div>
+        <div class="reasons" id="risk-reasons"></div>
+      </div>
+
+      <button class="secondary" id="btn-check">Force Risk Check</button>
+      <button class="secondary" id="btn-logout">Logout</button>
+    </div>
+  </div>
+
+  <script src="../sdk/genkey.js"></script>
+  <script>
+    const API_BASE = 'https://genkey22.workers.dev';
+    const genkey = new GenKey(API_BASE);
+    let currentSession = null;
+    let monitorTimer = null;
+
+    document.querySelectorAll('.mode').forEach(el => {
+      el.addEventListener('click', () => {
+        document.querySelectorAll('.mode').forEach(m => m.classList.remove('active'));
+        el.classList.add('active');
+      });
+    });
+
+    function getMode() {
+      return document.querySelector('.mode.active').dataset.mode;
+    }
+
+    function setStatus(msg, type = '') {
+      const el = document.getElementById('status');
+      el.textContent = msg;
+      el.className = 'status ' + type;
+    }
+
+    function showDashboard(result) {
+      document.getElementById('auth-card').classList.add('hidden');
+      document.getElementById('dashboard').classList.remove('hidden');
+      document.getElementById('display-name').textContent = result.user.displayName || result.user.username;
+      document.getElementById('mode-label').textContent =
+        result.mode === 'classic' ? 'Classic 2FA (password + passkey)' : 'Passwordless multi-factor';
+      currentSession = result;
+      startMonitoring();
+    }
+
+    function showAuth() {
+      document.getElementById('dashboard').classList.add('hidden');
+      document.getElementById('auth-card').classList.remove('hidden');
+      currentSession = null;
+      if (monitorTimer) clearInterval(monitorTimer);
+    }
+
+    function updateRisk(risk) {
+      const scoreEl = document.getElementById('risk-score');
+      scoreEl.textContent = Math.round(risk.score);
+      scoreEl.className = 'risk-score ' + risk.level;
+      document.getElementById('risk-level').textContent = risk.level.toUpperCase();
+      document.getElementById('risk-reasons').textContent = (risk.reasons || []).join(' · ');
+    }
+
+    function startMonitoring() {
+      if (monitorTimer) clearInterval(monitorTimer);
+      const check = async () => {
+        try {
+          const risk = await genkey.checkRisk({ sessionId: currentSession.sessionId });
+          updateRisk(risk);
+          if (risk.requireStepUp) {
+            setStatus('High risk detected – please step up', 'error');
+            await genkey.stepUp({
+              userId: currentSession.user.id,
+              sessionId: currentSession.sessionId
+            });
+            updateRisk({ score: 0, level: 'low', reasons: [] });
+          }
+        } catch (e) { console.error(e); }
+      };
+      check();
+      monitorTimer = setInterval(check, 12000);
+    }
+
+    document.getElementById('btn-register').onclick = async () => {
+      const username = document.getElementById('username').value.trim();
+      const password = document.getElementById('password').value;
+      const mode = getMode();
+      if (!username) return setStatus('Enter a username', 'error');
+      if (mode === 'classic' && !password) return setStatus('Classic mode needs a password', 'error');
+
+      setStatus('Creating passkey…');
+      try {
+        const result = await genkey.register({ username, mode, password });
+        setStatus('Registered!', 'success');
+        showDashboard(result);
+      } catch (err) {
+        setStatus(err.message, 'error');
+      }
+    };
+
+    document.getElementById('btn-login').onclick = async () => {
+      const username = document.getElementById('username').value.trim();
+      const password = document.getElementById('password').value;
+      if (!username) return setStatus('Enter a username', 'error');
+
+      setStatus('Authenticating…');
+      try {
+        const result = await genkey.login({ username, password });
+        setStatus('Signed in!', 'success');
+        showDashboard(result);
+      } catch (err) {
+        setStatus(err.message, 'error');
+      }
+    };
+
+    document.getElementById('btn-check').onclick = async () => {
+      if (!currentSession) return;
+      const risk = await genkey.checkRisk({ sessionId: currentSession.sessionId });
+      updateRisk(risk);
+    };
+
+    document.getElementById('btn-logout').onclick = () => {
+      showAuth();
+      setStatus('');
+    };
+  </script>
+</body>
+</html>
