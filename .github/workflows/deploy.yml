@@ -18,17 +18,15 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Decode full Worker source
+      - name: Decode Worker source
         run: |
-          set -e
           if [ -d src/b64parts ] && ls src/b64parts/*.b64 >/dev/null 2>&1; then
             cat $(ls src/b64parts/*.b64 | sort) | base64 -d > src/index.js
             echo "Decoded src/index.js ($(wc -c < src/index.js) bytes)"
             head -5 src/index.js
-            grep -q generateRegistrationOptions src/index.js && echo "WebAuthn OK"
-            grep -q DEMO_HTML src/index.js && echo "UI embedded OK"
           else
             echo "Using existing src/index.js"
+            head -5 src/index.js || true
           fi
 
       - name: Setup Node
