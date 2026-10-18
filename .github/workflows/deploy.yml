@@ -6,7 +6,7 @@ on:
     paths:
       - 'backend/**'
       - '.github/workflows/deploy.yml'
-  workflow_dispatch:  # Allows manual run from GitHub UI
+  workflow_dispatch:
 
 jobs:
   deploy:
@@ -17,6 +17,17 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Assemble full Worker from parts
+        run: |
+          if [ -d src/parts ] && ls src/parts/*.part >/dev/null 2>&1; then
+            cat src/parts/*.part > src/index.js
+            echo "Assembled src/index.js ($(wc -c < src/index.js) bytes)"
+            head -5 src/index.js
+          else
+            echo "No parts found, using existing src/index.js"
+          fi
+          grep -q generateRegistrationOptions src/index.js && echo "WebAuthn imports OK" || echo "WARNING: missing WebAuthn imports"
 
       - name: Setup Node
         uses: actions/setup-node@v4
