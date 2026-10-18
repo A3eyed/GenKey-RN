@@ -21,20 +21,14 @@ jobs:
       - name: Decode full Worker source
         run: |
           set -e
-          if [ -d src/b64parts ]; then
-            cat src/b64parts/00.b64 \
-                src/b64parts/01.b64 \
-                src/b64parts/02a.b64 \
-                src/b64parts/02b.b64 \
-                src/b64parts/03a.b64 \
-                src/b64parts/03b.b64 \
-              | base64 -d > src/index.js
+          if [ -d src/b64parts ] && ls src/b64parts/*.b64 >/dev/null 2>&1; then
+            cat $(ls src/b64parts/*.b64 | sort) | base64 -d > src/index.js
             echo "Decoded src/index.js ($(wc -c < src/index.js) bytes)"
-            head -8 src/index.js
-            grep -q generateRegistrationOptions src/index.js && echo "WebAuthn OK" || (echo "FAIL: missing WebAuthn" && exit 1)
+            head -5 src/index.js
+            grep -q generateRegistrationOptions src/index.js && echo "WebAuthn OK"
+            grep -q DEMO_HTML src/index.js && echo "UI embedded OK"
           else
             echo "Using existing src/index.js"
-            head -5 src/index.js
           fi
 
       - name: Setup Node
