@@ -21,15 +21,16 @@ jobs:
       - name: Prepare Worker source
         run: |
           set -e
-          if [ -d src/b64parts ] && ls src/b64parts/*.b64 >/dev/null 2>&1; then
+          if [ -f src/index.js ] && [ $(wc -c < src/index.js) -gt 10000 ] && grep -q generateRegistrationOptions src/index.js; then
+            echo "Using committed src/index.js ($(wc -c < src/index.js) bytes)"
+          elif [ -d src/b64parts ] && ls src/b64parts/*.b64 >/dev/null 2>&1; then
             cat $(ls src/b64parts/*.b64 | sort) | base64 -d > src/index.js
             echo "Decoded from b64 ($(wc -c < src/index.js) bytes)"
-          elif [ -f src/index.js ] && grep -q generateRegistrationOptions src/index.js; then
-            echo "Using committed src/index.js ($(wc -c < src/index.js) bytes)"
           else
             echo "ERROR: no Worker source"
             exit 1
           fi
+          # Validate completeness
           if ! grep -q 'export default' src/index.js; then
             echo "ERROR: missing export default - truncated source"
             tail -5 src/index.js
